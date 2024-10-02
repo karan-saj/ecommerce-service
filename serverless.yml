@@ -11,49 +11,130 @@ provider:
         - "dynamodb:GetItem"
         - "dynamodb:UpdateItem"
         - "dynamodb:DeleteItem"
-      Resource: "arn:aws:dynamodb:*:*:table/Products"
+      Resource:
+        - "arn:aws:dynamodb:*:*:table/Products"
+        - "arn:aws:dynamodb:*:*:table/ProductTaxonomyAttributes"
 
 functions:
   createProduct:
     handler: handler.createProduct
     events:
-      - http:
-          path: products
-          method: post
+      - graphql:
+          type: Mutation
+          field: createProduct
 
   getProduct:
     handler: handler.getProduct
     events:
-      - http:
-          path: products/{productId}
-          method: get
+      - graphql:
+          type: Query
+          field: getProduct
 
   updateProduct:
     handler: handler.updateProduct
     events:
-      - http:
-          path: products/{productId}
-          method: put
+      - graphql:
+          type: Mutation
+          field: updateProduct
 
   deleteProduct:
     handler: handler.deleteProduct
     events:
-      - http:
-          path: products/{productId}
-          method: delete
+      - graphql:
+          type: Mutation
+          field: deleteProduct
+
+  listProducts:
+    handler: handler.listProducts
+    events:
+      - graphql:
+          type: Query
+          field: listProducts
 
 resources:
   Resources:
+    AppSyncAPI:
+      Type: AWS::AppSync::GraphQLApi
+      Properties:
+        Name: "EcommerceAPI"
+        AuthenticationType: API_KEY
+
+    GraphQLSchema:
+      Type: AWS::AppSync::GraphQLSchema
+      Properties:
+        ApiId: !GetAtt AppSyncAPI.ApiId
+        Definition: !Sub |
+          type Product {
+              ProductId: ID!
+              Name: String!
+              Description: String!
+              Price: Float!
+              Category: String!
+              Stock: Int!
+              CreatedAt: String!
+              UpdatedAt: String!
+          }
+          
+          input ProductInput {
+              ProductId: ID!
+              Name: String!
+              Description: String!
+              Price: Float!
+              Category: String!
+              Stock: Int!
+          }
+
+          type Query {
+              getProduct(ProductId: ID!): Product
+              listProducts: [Product]
+          }
+
+          type Mutation {
+              createProduct(input: ProductInput!): Product
+              updateProduct(ProductId: ID!, input: ProductInput!): Product
+              deleteProduct(ProductId: ID!): String
+          }
+
     Products:
       Type: "AWS::DynamoDB::Table"
       Properties:
         TableName: "Products"
         AttributeDefinitions:
           - AttributeName: "ProductId"
-            AttributeType: "S"
+            AttributeType: "S"  # String type for primary key
+          - AttributeName: "Category"
+            AttributeType: "S"  # String type for GSI
         KeySchema:
           - AttributeName: "ProductId"
-            KeyType: "HASH"
+            KeyType: "HASH"    # Partition key
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
+
+    ProductTaxonomyAttributes:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: "ProductTaxonomyAttributes"
+        AttributeDefinitions:
+          - AttributeName: "TaxonomyId"
+            AttributeType: "S"
+          - AttributeName: "ParentId"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "TaxonomyId"
+            KeyType: "HASH"
+        GlobalSecondaryIndexes:
+          - IndexName: "ParentIndex"
+            KeySchema:
+              - AttributeName: "ParentId"
+                KeyType: "HASH"
+              - AttributeName: "Name"
+                KeyType: "RANGE"
+            Projection:
+              ProjectionType: "ALL"
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+
+plugins:
+  - serverless-appsync-plugin
