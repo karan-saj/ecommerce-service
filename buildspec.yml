@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 14
+    commands:
+      - npm install
+  pre_build:
+    commands:
+      - npm test
+  build:
+    commands:
+      - echo Build started on `date`
+      - npm run build
+artifacts:
+  files:
+    - src/**/*
+  base-directory: src
