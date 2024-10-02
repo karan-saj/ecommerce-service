@@ -1,0 +1,59 @@
+service: ecommerce-microservice
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:UpdateItem"
+        - "dynamodb:DeleteItem"
+      Resource: "arn:aws:dynamodb:*:*:table/Products"
+
+functions:
+  createProduct:
+    handler: handler.createProduct
+    events:
+      - http:
+          path: products
+          method: post
+
+  getProduct:
+    handler: handler.getProduct
+    events:
+      - http:
+          path: products/{productId}
+          method: get
+
+  updateProduct:
+    handler: handler.updateProduct
+    events:
+      - http:
+          path: products/{productId}
+          method: put
+
+  deleteProduct:
+    handler: handler.deleteProduct
+    events:
+      - http:
+          path: products/{productId}
+          method: delete
+
+resources:
+  Resources:
+    Products:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: "Products"
+        AttributeDefinitions:
+          - AttributeName: "ProductId"
+            AttributeType: "S"
+        KeySchema:
+          - AttributeName: "ProductId"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
